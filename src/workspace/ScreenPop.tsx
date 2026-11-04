@@ -147,6 +147,16 @@ export function useScreenPopWindow() {
     const id = setInterval(() => { if (popWin && popWin.closed) { popWin = null; set({ screenPopOut: false }); } }, 700);
     return () => clearInterval(id);
   }, [s.screenPopOut]);
+  // CTRL + SHIFT + F: open screen pops (listed under Settings → Display & Keyboard)
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'f')) return;
+      e.preventDefault();
+      set((x) => (x.call && x.call.phase !== 'ringing' ? { appSpaceTab: 'screenpop', callView: true, keypadOpen: false, consultOpen: false } : {}));
+    };
+    window.addEventListener('keydown', k);
+    return () => window.removeEventListener('keydown', k);
+  }, [set]);
   // the screen pop belongs to the interaction: it closes when the call ends
   useEffect(() => {
     if (!s.call && s.screenPopOut) { closePopWindow(); set({ screenPopOut: false }); }

@@ -26,6 +26,13 @@ export const DIR_TEAMS = [
   { name: 'DWCS_ITHD_L1_HT_Markets', members: 11, available: 0 },
 ];
 
+/** External contacts in the Directory's Address Book (fictional). */
+export const DIR_ADDRESS_BOOK = [
+  { name: 'Network Vendor Support', number: '+15555550170' },
+  { name: 'Facilities Helpdesk', number: '+15555550171' },
+  { name: 'HR Service Centre', number: '+15555550172' },
+];
+
 export interface DirSkill { name: string; available: number; queue: number; wait: string }
 export const DIR_SKILLS: DirSkill[] = [
   { name: 'DWCS_ITHD_IAM_SolCenter', available: 5, queue: 0, wait: '0 min' },
@@ -54,6 +61,49 @@ export const INBOUND_CALLERS = [
 ];
 
 /** Seed contact history (last ~3 days). `hoursAgo` is turned into a real date at load time. */
+export const EMAIL_SKILL = 'DWCS_ITHD_IAM_Email';
+/** the mailbox replies are sent from */
+export const EMAIL_FROM = ['Email_ITHD_IAM', 'Email_ITHD_ServiceDesk'];
+export const EMAIL_DISPOSITIONS = ['Resolved - Replied', 'Access Request Raised', 'Escalated to L2', 'Pending Customer Reply', 'No Action Required'];
+/** fictional customer fields shown in the App Space Details for a digital interaction */
+export const EMAIL_FIELDS = ['Preferred contact', 'Employee ID', 'Department', 'Cost centre', 'Location', 'Manager'];
+/**
+ * Quick replies (templated responses). Administrators configure these; {{placeholders}} are filled in
+ * with the customer's and agent's details when you use one.
+ */
+export const QUICK_REPLIES = [
+  { title: 'Agent Name Greeting', text: 'Hi {{customer.firstName}}. My name is {{agent.firstName}} and I will be helping you today.', fav: true },
+  { title: 'MFA re-registration', text: 'To move MFA to your new phone: sign in to the self-service portal from your laptop, choose Security info > Add sign-in method, then scan the QR code with the authenticator app.', fav: false },
+  { title: 'Ticket raised', text: 'I have raised ticket {{case.number}} for you. You will get updates by email.', fav: false },
+  { title: 'Access request submitted', text: 'I have submitted an access request for you. Your manager gets an approval email, and access usually works within 1 business day.', fav: true },
+  { title: 'Thanks for contacting us', text: 'Thanks for contacting the IT Service Desk, {{customer.firstName}}. Is there anything else I can help with?', fav: false },
+];
+export const CHAT_SKILL = 'DWCS_ITHD_IAM_Chat';
+/** review queues a drafted digital response can be sent to for approval (fictional) */
+export const REVIEW_QUEUES = ['DWCS_ITHD_Review_QA', 'DWCS_ITHD_Review_TeamLead', 'DWCS_ITHD_Review_Compliance', 'DWCS_ITHD_Review_Newhire'];
+export const DENY_REASONS = ['Please confirm the employee ID before promising access.', 'Add the ticket number so the customer can follow up.'];
+export interface ChatScenario { id: string; name: string; address: string; caseId: string; expected: string; fields: string[]; lines: string[]; previous?: string[] }
+/** fictional webchat: the first line arrives on accept, the rest after each agent reply */
+export const CHATS: ChatScenario[] = [
+  { id: 'hrportal', name: 'Ravi Menon', address: 'ravi.menon@example.com', caseId: '510600491260', expected: 'Access Request Raised',
+    fields: ['Chat', 'E40219', 'Human Resources', 'CC-1180', 'Bengaluru', 'Tamas Farkas'],
+    previous: ['Hi, my laptop won\u2019t connect to the office Wi-Fi.', 'Thanks, forgetting the network and joining again worked.'],
+    lines: ['Hi, I get "access denied" when I open the HR portal since this morning.', 'It says my role is missing. My manager said she approved it last week.', 'Great, thanks for the help!'] },
+];
+
+export interface EmailScenario { id: string; name: string; address: string; subject: string; caseId: string; html: string; expected: string; fields: string[] }
+export const EMAILS: EmailScenario[] = [
+  { id: 'mfa', name: 'Kenji Tanaka', address: 'kenji.tanaka@example.com', subject: 'MFA approvals not arriving on my new phone', caseId: '510600482913', expected: 'Resolved - Replied',
+    fields: ['Email', 'E10442', 'Treasury Operations', 'CC-3310', 'Singapore', 'Ana Bautista'],
+    html: '<p>Hi,</p><p>I replaced my phone over the weekend and now the sign-in approvals don\u2019t arrive on the new one. I can still get into my laptop but not into email on my phone.</p><p>Could you tell me what I need to do?</p><p>Regards,<br>Kenji</p>' },
+  { id: 'mailbox', name: 'Lucia Moreno', address: 'lucia.moreno@example.com', subject: 'Access to the Risk shared mailbox', caseId: '510600483377', expected: 'Access Request Raised',
+    fields: ['Email', 'E20981', 'Market Risk', 'CC-4120', 'Madrid', 'Eric Hale'],
+    html: '<p>Hello Service Desk,</p><p>My manager approved my access to the <b>Risk-Reporting</b> shared mailbox yesterday, but it still doesn\u2019t show in Outlook.</p><p>Thanks,<br>Lucia</p>' },
+  { id: 'reset', name: 'Omar Haddad', address: 'omar.haddad@example.com', subject: 'Password reset link expired', caseId: '510600484102', expected: 'Resolved - Replied',
+    fields: ['Phone', 'E31507', 'Payments', 'CC-2075', 'Dubai', 'Liam Ortega'],
+    html: '<p>Hi team,</p><p>The password reset link you sent me says it has expired. Can you send a new one?</p><p>Omar</p>' },
+];
+
 export const SEED_HISTORY_RAW: (Omit<Contact, 'date'> & { hoursAgo: number })[] = [
   { id: 'h1', number: '+15555550142', skill: INBOUND_SKILL, outbound: false, duration: '00:03:12', hoursAgo: 1.2 },
   { id: 'h2', number: '+15555550188', skill: OUTBOUND_SKILL, outbound: true, duration: '00:01:47', hoursAgo: 2.6 },
@@ -65,8 +115,11 @@ export const SEED_HISTORY_RAW: (Omit<Contact, 'date'> & { hoursAgo: number })[] 
   { id: 'h7', number: '+15555550123', skill: INBOUND_SKILL, outbound: false, duration: '00:05:31', hoursAgo: 50 },
   { id: 'h8', number: '+15555550123', skill: OUTBOUND_SKILL, outbound: true, duration: '00:02:09', hoursAgo: 48.5 },
   { id: 'h9', number: '+6325550111', skill: INBOUND_SKILL, outbound: false, duration: '00:07:44', hoursAgo: 27 },
+  // earlier emails (digital interactions show the customer name and the email skill)
+  { id: 'h10', number: 'Kenji Tanaka', skill: 'DWCS_ITHD_IAM_Email', outbound: false, duration: '00:09:12', hoursAgo: 3.4, channel: 'email' },
+  { id: 'h11', number: 'Lucia Moreno', skill: 'DWCS_ITHD_IAM_Email', outbound: false, duration: '00:04:30', hoursAgo: 30, channel: 'email' },
 ];
-export const seedHistory = (): Contact[] => SEED_HISTORY_RAW.map(({ hoursAgo, ...c }) => {
+export const seedHistory = (): Contact[] => [...SEED_HISTORY_RAW].sort((a, b) => a.hoursAgo - b.hoursAgo).map(({ hoursAgo, ...c }) => {
   const d = new Date(Date.now() - hoursAgo * 3600000);
   const p = (n: number) => String(n).padStart(2, '0');
   return { ...c, date: `${p(d.getMonth() + 1)}/${p(d.getDate())}/${String(d.getFullYear()).slice(2)} ${p(d.getHours())}:${p(d.getMinutes())}` };

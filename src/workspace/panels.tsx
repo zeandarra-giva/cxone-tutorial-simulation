@@ -4,12 +4,13 @@ import {
   Search, List, BookUser, CalendarDays, CircleUserRound, Settings, ChartColumn, Phone, Star, Headset, Wrench, ChevronDown, ChevronRight, ChevronLeft,
   LocateFixed, CalendarPlus, Waypoints, PhoneIncoming, Voicemail, ExternalLink, Volume1, Volume2, Play, Clock, AppWindow, ArrowUpDown, SendHorizontal,
   Keyboard, Funnel, CircleCheck, CircleMinus, CircleQuestionMark, Users, Calendar, CalendarClock, TriangleAlert,
+  MessageSquare,
 } from 'lucide-react';
 import { useSim, emptyDraft, type Commitment, type SimState } from '../store';
 import { toast } from '../training/progress';
-import { USER } from '../data/data';
+import { USER, type Contact } from '../data/data';
 import { HistoryIcon } from '../components/icons';
-import { fmtDur } from './callActions';
+import { fmtDur, requestOutbound, startOutbound } from './callActions';
 import {
   AGENT_INFO, AGENT_SKILLS, DIR_AGENTS, DIR_FILTERS, DIR_SKILLS, ISSUE_CATEGORIES, ISSUE_PRIORITIES, LOG_LEVELS, QUEUE_CHANNELS, RINGTONES, SHORTCUTS,
   TEAM_PRODUCTIVITY, TIMEZONES, TONES, WEM_SEGMENTS, SHIFT_BLOCKS, DIR_TEAMS,
@@ -17,6 +18,24 @@ import {
 
 function PanelTitle({ icon, children, right }: { icon: React.ReactNode; children: React.ReactNode; right?: React.ReactNode }) {
   return <div className="aw-ptitle">{icon}<span>{children}</span>{right && <span className="aw-ptitle-right">{right}</span>}</div>;
+}
+
+/** Dropdown of the agent's outbound skills (only when they have more than one). Picking one places the call. */
+export function SkillDropdown() {
+  const { s, set } = useSim();
+  const p = s.skillPrompt;
+  if (!p) return null;
+  return (
+    <div className="skill-dd" data-tour="ws-skill-dd" role="listbox" aria-label="Choose an outbound skill">
+      <div className="skill-dd-h">Call {p.name ?? p.number} using…</div>
+      {s.outboundSkills.map((k, i) => (
+        <button key={k} role="option" data-tour={i === 0 ? 'ws-skill-dd-first' : undefined} onClick={() => set((x) => ({ ...startOutbound({ ...x, skillPrompt: null }, p.number, p.name, k), skillPrompt: null }))}>
+          <Phone size={14} /> {k}
+        </button>
+      ))}
+      <button className="skill-dd-cancel" onClick={() => set({ skillPrompt: null })}>Cancel</button>
+    </div>
+  );
 }
 
 /* ---------------- Contact History ---------------- */
@@ -28,10 +47,10 @@ export function ContactHistoryPanel() {
       {s.contactHistory.length ? (
         <div className="ch-list aw-ch" data-tour="ws-history-list">
           {s.contactHistory.map((c, i) => (
-            <button key={c.id + i} className="ch-item" data-tour={i === 0 ? 'ws-history-first' : undefined} onClick={() => set({ callbackContact: c })}>
+            <button key={c.id + i} className={'ch-item' + (isDigital(c) ? ' digital' : '')} data-tour={i === 0 ? 'ws-history-first' : undefined} onClick={() => !isDigital(c) && set({ callbackContact: c })}>
               <div className="ch-left">
                 <div className="ch-num">{c.number}</div>
-                <div className="ch-skill"><span className="dir">{c.outbound ? '↑' : '↓'}</span><Phone size={13} /> {c.skill}</div>
+                <div className="ch-skill">{isDigital(c) ? <MessageSquare size={13} className="ch-dig" /> : <><span className="dir">{c.outbound ? '↑' : '↓'}</span><Phone size={13} /></>} {c.skill}</div>
               </div>
               <div className="ch-right"><div>{c.date}</div><div className="ch-closed">Closed</div></div>
             </button>
@@ -43,6 +62,9 @@ export function ContactHistoryPanel() {
     </div>
   );
 }
+
+/** emails and chats (no callback, shown with a message icon) */
+const isDigital = (c: Contact) => c.channel === 'email' || c.channel === 'chat';
 
 /* ---------------- Search ---------------- */
 export function SearchPanel() {
@@ -100,6 +122,7 @@ export function QueuePanel() {
 }
 
 /* ---------------- Directory ---------------- */
+/** Directory (left menu). During a call the App Space uses ConsultDirectory instead (see ConsultPanel.tsx). */
 export function DirectoryPanel() {
   const { s, set } = useSim();
   const [showAll, setShowAll] = useState({ agents: false, skills: false });
@@ -119,11 +142,12 @@ export function DirectoryPanel() {
   const showSkills = (f === 'All' || f === 'Skills' || f === 'Favorites') && !isNumber;
   const teams = DIR_TEAMS.filter((t) => !ql || t.name.toLowerCase().includes(ql));
   const showTeams = (f === 'All' || f === 'Teams') && !isNumber && (f === 'Teams' || !!ql);
-  const callTo = (number: string, name?: string) => set({ skillPrompt: { number, name } });
+  const callTo = (number: string, name?: string) => set((x) => requestOutbound(x, number, name));
+  const ddFor = s.skillPrompt?.number;
   const busy = !!s.call || !!s.wrap;
   return (
     <div className="aw-panel">
-      <PanelTitle icon={<BookUser size={19} />}>Directory</PanelTitle>
+      {<PanelTitle icon={<BookUser size={19} />}>Directory</PanelTitle>}
       <div className="rel">
         <div className={'dir-search' + (focus ? ' focus' : '')} data-tour="ws-dir-search">
           <Search size={18} />
@@ -151,7 +175,10 @@ export function DirectoryPanel() {
         {isNumber && (
           <>
             <div className="dir-outbound">Outbound: {digits}</div>
-            <button className="dir-voice" data-tour="ws-dir-voicecall" disabled={busy} onClick={() => callTo(digits)}><Phone size={18} /> Voice Call</button>
+            {<div className="rel dir-voice-wrap">
+                  <button className="dir-voice" data-tour="ws-dir-voicecall" disabled={busy} onClick={() => callTo(digits)}><Phone size={18} /> Voice Call</button>
+                  {ddFor === digits && <SkillDropdown />}
+                </div>}
             <div className="aw-empty small">No Matches Found</div>
           </>
         )}
@@ -164,7 +191,7 @@ export function DirectoryPanel() {
                   <div className="dir-name"><Headset size={17} className="dir-ic" /> {a.name}</div>
                   <div className="dir-meta">
                     <StateIcon state={a.state} /> {a.state} <span className="muted">{a.since}</span>
-                    <button className="dir-call" title="Call" disabled={busy} data-tour={i === 0 ? 'ws-dir-agent-call' : undefined} onClick={() => callTo('Ext. ' + (1001 + i), a.name)}><Phone size={13} /></button>
+                    {<button className="dir-call" title="Call" disabled={busy} data-tour={i === 0 ? 'ws-dir-agent-call' : undefined} onClick={() => callTo('Ext. ' + (1001 + i), a.name)}><Phone size={13} /></button>}
                   </div>
                 </div>
                 <button className={'dir-star' + (fav(a.name) ? ' on' : '')} data-tour={i === 0 ? 'ws-dir-star' : undefined} onClick={() => toggleFav(a.name)} aria-label="Favorite"><Star size={18} /></button>
@@ -184,7 +211,7 @@ export function DirectoryPanel() {
                   <div className="dir-meta">
                     {k.available ? <><StateIcon state="Available" /> Available ({k.available})</> : <><StateIcon state="Unavailable" /> Unavailable</>}
                     <span className="muted">Queue: {k.queue}</span><span className="muted">Wait: {k.wait}</span>
-                    <button className="dir-call boxed" title="Call" disabled={busy} onClick={() => callTo('Skill ' + k.name, k.name)}><Phone size={13} /></button>
+                    {<button className="dir-call boxed" title="Call" disabled={busy} onClick={() => callTo('Skill ' + k.name, k.name)}><Phone size={13} /></button>}
                   </div>
                 </div>
                 <button className={'dir-star' + (fav(k.name) ? ' on' : '')} onClick={() => toggleFav(k.name)} aria-label="Favorite"><Star size={18} /></button>
@@ -213,7 +240,7 @@ export function DirectoryPanel() {
   );
 }
 
-function StateIcon({ state }: { state: string }) {
+export function StateIcon({ state }: { state: string }) {
   if (state === 'Available') return <CircleCheck size={15} className="st-fill ok" />;
   if (state === 'Working') return <Clock size={15} className="st-ic" style={{ color: '#f0a030' }} />;
   return <CircleMinus size={15} className="st-fill bad" />;

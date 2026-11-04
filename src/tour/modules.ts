@@ -36,7 +36,8 @@ export const MODULES: LearningModule[] = [
     icon: 'workspace',
     sections: [
       { title: 'Get set up', lessons: ['agent-launch', 'ws-quick', 'ws-tour', 'ws-ready'] },
-      { title: 'Handle calls', lessons: ['ws-inbound', 'ws-outbound', 'ws-callback', 'ws-directory'] },
+      { title: 'Handle calls', lessons: ['ws-inbound', 'ws-controls', 'ws-transfer', 'ws-screenpop', 'ws-outbound', 'ws-callback', 'ws-directory'] },
+      { title: 'Digital channels', lessons: ['ws-email', 'ws-chat', 'ws-approval'] },
       { title: 'Manage your day', lessons: ['ws-schedule', 'ws-breaks', 'ws-settings', 'ws-reporting'] },
     ],
   },

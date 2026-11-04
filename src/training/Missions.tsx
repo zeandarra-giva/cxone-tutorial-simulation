@@ -57,7 +57,7 @@ export const MISSIONS: Mission[] = [
   },
   {
     id: 'outbound', title: 'Dial out', brief: 'A user left a voicemail asking you to call +1 555 555 0134.', objective: 'Call +15555550134. Nobody picks up, so log it as "No Answer / Voicemail".',
-    hints: [{ text: 'New Outbound (person + icon) opens the Directory. Type the number.', sel: tsel('ws-outbound') }, { text: 'Click Voice Call, then Call with your outbound skill.', sel: tsel('ws-dir-voicecall') }],
+    hints: [{ text: 'New Outbound (the start another action icon above the Interactions panel) opens the Directory. Type the number.', sel: tsel('ws-outbound') }, { text: 'Click Voice Call. With one outbound skill it dials straight away.', sel: tsel('ws-dir-voicecall') }],
     setup: ready,
     check: (s, c) => newHandled(s, c).some((h) => h.direction === 'out' && h.number.replace(/\D/g, '').endsWith('5555550134') && h.disposition === 'No Answer / Voicemail'),
   },
@@ -75,7 +75,7 @@ export const MISSIONS: Mission[] = [
   },
   {
     id: 'transfer', title: 'Hand it to the experts', brief: 'Another VPN failure. This one belongs with the network team.', objective: 'Transfer the caller to the DWCS_ITHD_L2_Network skill, then save the outcome.',
-    hints: [{ text: 'Consult / Transfer is the person + icon on the call card.', sel: tsel('ws-vc-consult') }, { text: 'Search "Network" and click Transfer next to the skill.', sel: tsel('ws-consult') }],
+    hints: [{ text: 'Consult / Transfer is the person + icon on the call card.', sel: tsel('ws-vc-consult') }, { text: 'The Directory tab opens in the App Space. Search "Network" and click the Transfer icon (⇄) next to the skill.', sel: tsel('ws-appspace') }],
     setup: ready, ring: { scenario: 'vpn', delay: 2500 },
     check: (s, c) => s.stats.transfers > c.base.transfers && s.stats.handled > c.base.handled,
   },

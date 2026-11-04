@@ -191,7 +191,7 @@ export const UNAVAILABLE_CODES = [
   'Call Wrap Up',
 ];
 
-export interface Contact { id: string; number: string; skill: string; outbound: boolean; date: string; duration: string }
+export interface Contact { id: string; number: string; skill: string; outbound: boolean; date: string; duration: string; channel?: 'voice' | 'email' | 'chat' }
 export const CONTACT_HISTORY: Contact[] = [
   { id: 'c1', number: '+36705550143', skill: 'DWCS_ITHD_L2_Outbound', outbound: true, date: '09/23/26 06:56', duration: '00:04:12' },
   { id: 'c2', number: '+36705550143', skill: 'DWCS_ITHD_L1_Outbound', outbound: true, date: '09/22/26 16:16', duration: '00:01:47' },

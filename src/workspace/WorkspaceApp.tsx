@@ -4,15 +4,18 @@ import { startRinging } from './ringtone';
 import {
   Bell, CircleQuestionMark, Link2, Search, List, BookUser, CalendarDays, CircleUserRound, Settings, ChartColumn, Ellipsis, UserPlus,
   CircleCheck, CircleMinus, LogOut, X, Info, ListCollapse, PhoneIncoming, PhoneOutgoing, Phone, GripVertical, Inbox, CalendarClock, PhoneCall, ArrowDownLeft,
+  Upload,
 } from 'lucide-react';
 import { useSim, statusPatch, type SimState } from '../store';
 import { UNAVAILABLE_CODES, USER } from '../data/data';
 import { AgentWorkspaceIcon, HistoryIcon, Logo } from '../components/icons';
 import { useTour } from '../tour/TourEngine';
-import { accept, fmtTimer, reject, ringInbound, startOutbound } from './callActions';
+import { accept, fmtTimer, reject, requestOutbound, ringInbound, startOutbound } from './callActions';
 import { CUSTOMIZE_ITEMS, OUTBOUND_SKILL } from './wsData';
 import { ContactHistoryPanel, DirectoryPanel, HelpPanel, QueuePanel, ReportingPanel, SchedulePanel, SearchPanel, SettingsPanel, WemPanel, parseCommitTime } from './panels';
-import { CallCard, CallView } from './CallView';
+import { CallCard, CallView, OutcomeDrawer } from './CallView';
+import { DigitalCanvas, EmailCard } from './DigitalCanvas';
+import { customerChatReply, deliverEmail, resolveApproval } from './digitalActions';
 
 export function useNow(ms = 1000) {
   const [now, setNow] = useState(Date.now());
@@ -49,6 +52,47 @@ export function WorkspaceApp() {
     const id = setTimeout(() => set((x) => (x.call?.phase === 'dialing' ? { call: { ...x.call, phase: 'active', start: Date.now(), connectedAt: Date.now() } } : {})), 2500);
     return () => clearTimeout(id);
   }, [s.call?.phase, s.call?.id]);
+
+  // Consult: the other party answers after a short ring.
+  useEffect(() => {
+    if (s.call?.consult?.phase !== 'dialing') return;
+    const id = setTimeout(() => set((x) => (x.call?.consult?.phase === 'dialing' ? { call: { ...x.call, consult: { ...x.call.consult, phase: 'active', start: Date.now() } } } : {})), 2200);
+    return () => clearTimeout(id);
+  }, [s.call?.consult?.phase, s.call?.consult?.name]);
+
+  // Free practice: one practice email arrives ~20s after you first go Available (digital work doesn't change your voice state).
+  const [firstAvail, setFirstAvail] = useState<number | null>(null);
+  const [emailSent, setEmailSent] = useState(false);
+  useEffect(() => { if (firstAvail === null && s.agentStatus === 'Available') setFirstAvail(Date.now()); }, [s.agentStatus]);
+  useEffect(() => {
+    if (tour || s.trainingMode !== 'free' || emailSent || s.digital || firstAvail === null || now - firstAvail < 20000) return;
+    setEmailSent(true);
+    set((x) => (x.trainingMode === 'free' && !x.digital ? deliverEmail(x, 'mailbox') : {}));
+  }, [now, tour, s.trainingMode, emailSent, !!s.digital, firstAvail]);
+
+  // Webchat: the (simulated) customer types their first message after you accept, and answers each of your replies.
+  const dg = s.digital;
+  const lastFromAgent = dg?.messages[dg.messages.length - 1]?.from === 'agent';
+  const chatTurn = !!dg && dg.channel === 'chat' && dg.phase === 'active' && (dg.script === 0 || lastFromAgent);
+  useEffect(() => {
+    if (!chatTurn) return;
+    const id = setTimeout(() => set((x) => customerChatReply(x)), dg!.script === 0 ? 1500 : 2600);
+    return () => clearTimeout(id);
+  }, [chatTurn, dg?.messages.length, dg?.script]);
+
+  // Review approval: the (simulated) reviewer answers a few seconds after you request approval.
+  const waiting = !!s.approval && !s.digital;
+  useEffect(() => {
+    if (!waiting) return;
+    const id = setTimeout(() => set((x) => resolveApproval(x)), 5000);
+    return () => clearTimeout(id);
+  }, [waiting, s.approval?.at]);
+  // CXone notifications disappear after a few seconds
+  useEffect(() => {
+    if (!s.wsToast) return;
+    const id = setTimeout(() => set({ wsToast: null }), 4500);
+    return () => clearTimeout(id);
+  }, [s.wsToast?.at]);
 
   // Free-explore realism: an inbound call arrives ~10s after going Available. Unanswered calls are refused after 30s.
   useEffect(() => {
@@ -87,12 +131,19 @@ export function WorkspaceApp() {
         <AwRail />
         <AssignPanel now={now} />
         <main className="aw-main" data-tour="ws-main">
-          <div className="aw-card">{s.callView && (s.call || s.wrap) ? <CallView now={now} /> : <Panel />}</div>
+          <div className={'aw-card' + (s.digitalView && s.digital?.phase === 'active' ? ' canvas' : '')}>{s.digitalView && s.digital?.phase === 'active' ? <DigitalCanvas /> : s.callView && (s.call || s.wrap) ? <CallView now={now} /> : <Panel />}</div>
         </main>
       </div>
+      {s.wsToast && (
+        <div className={'ws-toast ' + (s.wsToast.kind ?? 'ok')} role="status" data-tour="ws-toast">
+          {s.wsToast.kind === 'bad' ? <CircleMinus size={18} /> : <CircleCheck size={18} />}<span>{s.wsToast.text}</span>
+          <button aria-label="Dismiss" onClick={() => set({ wsToast: null })}><X size={14} /></button>
+        </div>
+      )}
+      {s.approval && !s.digital && <div className="ws-await" data-tour="ws-awaiting">Waiting for approval from {s.approval.queue}…</div>}
       {s.extPromptOpen && <ExtensionPrompt />}
       {s.customizeOpen && <CustomizeMenu />}
-      {s.skillPrompt && <SkillPrompt />}
+      {s.skillPrompt && !(s.wsPanel === 'directory' && !s.callView && s.dirQuery.replace(/[\s()-]/g, '') === s.skillPrompt.number) && <SkillPrompt />}
       {s.callbackContact && <CallbackModal />}
     </div>
   );
@@ -127,7 +178,7 @@ function AwHeader({ now }: { now: number }) {
       </div>
       <div className="aw-top-center"><Logo size={23} /></div>
       <div className="aw-top-right" data-tour="ws-topbar-right">
-        <button className="aw-ic" data-tour="ws-help" aria-label="Help" onClick={() => set({ wsPanel: 'help', callView: false })} title="Help"><CircleQuestionMark size={23} /></button>
+        <button className="aw-ic" data-tour="ws-help" aria-label="Help" onClick={() => set({ wsPanel: 'help', callView: false, digitalView: false })} title="Help"><CircleQuestionMark size={23} /></button>
         <span className="aw-sep" />
         <div className="rel">
           <button className="aw-ic" data-tour="ws-notifications" aria-label="Notifications" onClick={() => set((x) => ({ notifOpen: !x.notifOpen, statusMenuOpen: false, notifications: x.notifOpen ? x.notifications.map((n) => ({ ...n, read: true })) : x.notifications }))}>
@@ -225,7 +276,7 @@ function AwRail() {
   return (
     <nav className="aw-rail" data-tour="ws-rail">
       {RAIL.map((r) => (
-        <RailBtn key={r.id} id={r.id} label={r.label} active={s.wsPanel === r.id && !s.callView} onClick={() => set({ wsPanel: r.id, callView: false, scheduleMode: r.id === 'schedule' ? 'calendar' : s.scheduleMode })}>
+        <RailBtn key={r.id} id={r.id} label={r.label} active={s.wsPanel === r.id && !s.callView} onClick={() => set({ wsPanel: r.id, callView: false, digitalView: false, scheduleMode: r.id === 'schedule' ? 'calendar' : s.scheduleMode })}>
           {r.icon}
         </RailBtn>
       ))}
@@ -264,7 +315,7 @@ function CustomizeMenu() {
                 className={'aw-customize-item' + (i.enabled ? '' : ' off')}
                 disabled={!i.enabled}
                 title={i.enabled ? `Open ${i.label}` : 'Not enabled for your account'}
-                onClick={() => i.panel && set({ wsPanel: i.panel, callView: false, customizeOpen: false })}
+                onClick={() => i.panel && set({ wsPanel: i.panel, callView: false, digitalView: false, customizeOpen: false })}
               >
                 <GripVertical size={14} className="grip" /> {i.label}
               </button>
@@ -282,14 +333,15 @@ function AssignPanel({ now }: { now: number }) {
   const [tipOut, setTipOut] = useState(false);
   const due = s.commitments.filter((c) => c.due);
   const call = s.call, wrap = s.wrap;
-  const empty = !call && !wrap && !due.length;
+  const done = !call && !wrap && !s.digital && !!s.completedAt && now - s.completedAt < 4000;
+  const empty = !call && !wrap && !due.length && !done && !s.digital;
   return (
     <aside className={'aw-assign' + (s.assignCollapsed ? ' collapsed' : '')} data-tour="ws-assign">
       <div className="aw-assign-top">
         <div className="rel">
           <button className="aw-ic dark" data-tour="ws-outbound" aria-label="New Outbound" onMouseEnter={() => setTipOut(true)} onMouseLeave={() => setTipOut(false)}
-            onClick={() => set({ wsPanel: 'directory', callView: false, dirQuery: '' })}>
-            <UserPlus size={22} />
+            onClick={() => set({ wsPanel: 'directory', callView: false, digitalView: false, dirQuery: '' })}>
+            <Upload size={21} />
           </button>
           {tipOut && <div className="aw-tip below dark">New Outbound</div>}
         </div>
@@ -317,8 +369,14 @@ function AssignPanel({ now }: { now: number }) {
             </div>
           )}
           {call && call.phase !== 'ringing' && <CallCard now={now} />}
+          {s.digital && <EmailCard now={now} />}
+          {done && (
+            <div className="int-card completed" data-tour="ws-completed">
+              <span>Interaction completed</span><CircleCheck size={26} />
+            </div>
+          )}
           {wrap && (
-            <button className={'int-card wrap' + (s.callView ? ' selected' : '')} data-tour="ws-wrap-card" onClick={() => set({ callView: true })}>
+            <button className={'int-card wrap' + (s.callView ? ' selected' : '')} data-tour="ws-wrap-card" onClick={() => set({ callView: true, digitalView: false })}>
               <div className="int-card-row"><Phone size={16} /> <b>{wrap.call.name ?? wrap.call.number}</b><span className="int-timer">{fmtTimer(now - wrap.endedAt)}</span></div>
               <div className="int-skill">{wrap.call.skill}</div>
               <div className="int-state wrap">Outcome required</div>
@@ -345,6 +403,7 @@ function AssignPanel({ now }: { now: number }) {
           )}
         </div>
       )}
+      {!s.assignCollapsed && <OutcomeDrawer />}
     </aside>
   );
 }
@@ -414,28 +473,26 @@ function ExtensionPrompt() {
   );
 }
 
+/** Outbound skill choice outside the Directory (Callback, Save & Redial) when the agent has several outbound skills. */
 function SkillPrompt() {
   const { s, set } = useSim();
   const p = s.skillPrompt!;
-  const [skill, setSkill] = useState(OUTBOUND_SKILL);
   return (
     <div className="modal-scrim dim aw-scrim">
       <div className="cb-card" data-tour="ws-skill-prompt">
         <div className="cb-head"><span>Select a skill</span><button className="x-circle" onClick={() => set({ skillPrompt: null })} aria-label="Close">×</button></div>
         <div className="cb-row">Outbound call to <b>{p.name ?? p.number}</b></div>
-        <label className="aw-field">
-          <span>Outbound skill</span>
-          <select value={skill} onChange={(e) => setSkill(e.target.value)} data-tour="ws-skill-select">
-            <option>{OUTBOUND_SKILL}</option>
-          </select>
-        </label>
-        <div className="cb-actions">
-          <button className="btn-outline sm" onClick={() => set({ skillPrompt: null })}>Cancel</button>
-          <button className="btn-primary sm" data-tour="ws-skill-call" onClick={() => set((x) => startOutbound(x, p.number, p.name, skill))}><Phone size={12} /> Call</button>
-        </div>
+        <div className="skill-dd inline"><SkillDropdownList /></div>
       </div>
     </div>
   );
+}
+function SkillDropdownList() {
+  const { s, set } = useSim();
+  const p = s.skillPrompt!;
+  return <>{s.outboundSkills.map((k, i) => (
+    <button key={k} data-tour={i === 0 ? 'ws-skill-dd-first' : undefined} onClick={() => set((x) => ({ ...startOutbound({ ...x, skillPrompt: null }, p.number, p.name, k), skillPrompt: null }))}><Phone size={14} /> {k}</button>
+  ))}</>;
 }
 
 function CallbackModal() {
@@ -450,7 +507,7 @@ function CallbackModal() {
         <div className="cb-actions">
           <button className="btn-outline sm" onClick={() => set({ callbackContact: null })}>Cancel</button>
           <button className="btn-primary sm" data-tour="ws-callback-btn" disabled={!!s.call || !!s.wrap}
-            onClick={() => set({ callbackContact: null, skillPrompt: { number: c.number } })}>Callback</button>
+            onClick={() => set((x) => ({ callbackContact: null, ...requestOutbound({ ...x, callbackContact: null }, c.number) }))}>Callback</button>
         </div>
       </div>
     </div>
