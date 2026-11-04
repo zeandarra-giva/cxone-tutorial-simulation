@@ -1153,7 +1153,7 @@ textarea, select { font-family: inherit; }
 }
 .learn-side .ls-head, .learn-side .ls-xp { background: #0f1524; }
 .learn-side .ls-xp { border-top-color: var(--sd-line); }
-.learn-side .ls-body { scrollbar-color: #3a4664 transparent; }
+.learn-side .ls-body { scrollbar-color: #56648a transparent; scrollbar-width: thin; scrollbar-gutter: stable; overscroll-behavior: contain; }
 .learn-side .dock-intro { color: var(--sd-text-2); }
 .learn-side .ls-tip { background: var(--sd-bg-2); color: var(--sd-text-2); }
 
@@ -1314,6 +1314,9 @@ textarea, select { font-family: inherit; }
 .crm-note { margin: 0 18px 18px; padding: 10px 12px; background: #f6f8fa; border-radius: 6px; font-size: 12.5px; color: #555; line-height: 1.5; }
 
 /* Walkthrough with the sidebar: a quiet outline, nothing dimmed or blocked */
+/* welcome / intro cards (no target): dim the stage so the centered card stands out */
+.tour-welcome-dim { position: fixed; background: rgba(10,20,40,.62); pointer-events: auto; animation: tour-dim-in .2s ease; }
+@keyframes tour-dim-in { from { opacity: 0; } to { opacity: 1; } }
 .tour-ring.soft { border: 2px solid rgba(255,90,31,.85); box-shadow: 0 0 0 4px rgba(255,90,31,.12); border-radius: 6px; animation: none; transition: all .25s ease; }
 .tour-callout { box-shadow: 0 10px 30px rgba(0,0,0,.22); }
 .tour-callout.corner { width: 300px; border-top-color: #8a94a8; }
@@ -1709,3 +1712,7 @@ textarea, select { font-family: inherit; }
 .cd-filter { width: 100%; margin-top: 10px; padding: 9px 10px; border: 1px solid #d6d9dc; border-radius: 3px; background: #fff; font-size: 14px; color: #333; }
 .cd-more { display: block; margin: 6px auto 4px; color: #3f4a56; font-size: 15px; }
 .cd-more:hover { text-decoration: underline; }
+
+/* voice speed slider (sound settings) */
+.lp-speed input[type=range] { flex: 1; min-width: 0; accent-color: #2f7de1; }
+.lp-speed b { min-width: 44px; text-align: right; font-weight: 600; color: inherit; }

@@ -12,10 +12,12 @@ export interface Progress {
   voice: boolean;
   /** chosen narrator voice name ('' = pick the most natural one available) */
   narratorVoice: string;
+  /** how fast every voice speaks (1 = normal; 0.5 slowest, 2 fastest) */
+  speechRate: number;
   captions: boolean;
   traineeName: string;
 }
-const blank = (): Progress => ({ xp: 0, badges: [], explored: [], missions: {}, quizBest: 0, simBest: 0, storyDone: [], voice: true, narratorVoice: '', captions: true, traineeName: '' });
+const blank = (): Progress => ({ xp: 0, badges: [], explored: [], missions: {}, quizBest: 0, simBest: 0, storyDone: [], voice: true, narratorVoice: '', speechRate: 1, captions: true, traineeName: '' });
 
 export function getProgress(): Progress {
   try { return { ...blank(), ...JSON.parse(localStorage.getItem(KEY) || '{}') }; } catch { return blank(); }

@@ -241,6 +241,7 @@ function DockedSpotlight({ step, index, total }: { step: TourStep; index: number
 
   return (
     <div className="tour-root docked">
+      {!step.target && <div className="tour-welcome-dim" style={{ left: sx, top: sy, width: sw, height: sh }} />}
       {hole && <div className="tour-ring soft" style={{ left: hole.x, top: hole.y, width: hole.w, height: hole.h }} />}
       <div className={'tour-callout' + (!step.target ? ' center' : '') + (corner ? ' corner' : '')} ref={tipRef} style={tipStyle} role="dialog" aria-live="polite">
         <div className="tc-top"><span>Step {index + 1} / {total}</span></div>

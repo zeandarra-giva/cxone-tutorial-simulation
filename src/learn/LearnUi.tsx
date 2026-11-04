@@ -1,9 +1,9 @@
-import { createContext, isValidElement, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, isValidElement, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Captions, GraduationCap, Home, PanelLeftClose, PanelLeftOpen, Volume2, VolumeX, ArrowLeft, RotateCcw, LogOut, CircleCheck, MousePointerClick, ExternalLink } from 'lucide-react';
 import { useTour } from '../tour/TourEngine';
 import type { Tour } from '../tour/tours';
 import { getProgress, updateProgress } from '../training/progress';
-import { englishVoices, speak, speechSupported, stopSpeech } from '../training/speech';
+import { englishVoices, speak, speechSupported, stopSpeech, SPEECH_RATES } from '../training/speech';
 
 /* ------------------------------------------------------------------ */
 /* Sidebar collapsed state (shared with the tour spotlight)            */
@@ -105,6 +105,7 @@ export function SidebarShell({ title, sub, top, modes, mode, onMode, children, f
             <Captions size={16} /><span>Captions</span><i className={captions ? 'on' : ''} />
           </button>
           <NarratorVoice />
+          <VoiceSpeed />
         </div>
       )}
       {top}
@@ -157,6 +158,18 @@ export function LessonPlayer({ onExit }: { onExit?: () => void }) {
     if (step) narrate(step.title, step.body, step);
   }, [tour?.id, index]);
   useEffect(() => () => stopSpeech(), []);
+  // keep the current step visible in the sidebar's step list. Only the sidebar's own scroll area moves
+  // (scrollIntoView would also shift the page's overflow-hidden wrappers).
+  const curRef = useRef<HTMLLIElement>(null);
+  useEffect(() => {
+    const li = curRef.current;
+    const box = li?.closest('.ls-body') as HTMLElement | null;
+    if (!li || !box) return;
+    const lr = li.getBoundingClientRect(), br = box.getBoundingClientRect();
+    const k = box.clientHeight / (br.height || 1); // the app is scaled: screen px -> CSS px
+    if (lr.bottom > br.bottom - 8) box.scrollTop += (lr.bottom - br.bottom) * k + 24;
+    else if (lr.top < br.top + 8) box.scrollTop -= (br.top - lr.top) * k + 24;
+  }, [tour?.id, index]);
   if (!tour || !step) return null;
   const total = tour.steps.length;
   const action = step.advance === 'click' || step.advance === 'state';
@@ -186,7 +199,7 @@ export function LessonPlayer({ onExit }: { onExit?: () => void }) {
       </div>
       <ol className="lp-steps">
         {tour.steps.map((st, i) => (
-          <li key={i} className={i < index ? 'done' : i === index ? 'cur' : ''}>
+          <li key={i} ref={i === index ? curRef : undefined} className={i < index ? 'done' : i === index ? 'cur' : ''}>
             <span className="lp-dot">{i < index ? <CircleCheck size={14} /> : i + 1}</span>{st.title}
           </li>
         ))}
@@ -222,6 +235,24 @@ export function useCompletionTick() {
   }, []);
 }
 
+/** How fast the narrator and the simulated callers speak. Applies from the next sentence. */
+export function VoiceSpeed() {
+  const [rate, setRate] = useState(() => getProgress().speechRate || 1);
+  if (!speechSupported()) return null;
+  const idx = Math.max(0, SPEECH_RATES.indexOf(rate));
+  const label = (r: number) => (r === 1 ? 'Normal' : `${r}×`);
+  const pick = (r: number) => { setRate(r); updateProgress((x) => ({ ...x, speechRate: r })); };
+  const preview = () => { stopSpeech(); void speak('This is how fast I will speak.', 'narrator'); };
+  return (
+    <label className="lp-voice lp-speed">
+      <span>Voice speed</span>
+      <input type="range" min={0} max={SPEECH_RATES.length - 1} step={1} value={idx} aria-valuetext={label(rate)}
+        onChange={(e) => pick(SPEECH_RATES[Number(e.target.value)])} onPointerUp={preview} onKeyUp={(e) => { if (e.key.startsWith('Arrow')) preview(); }} />
+      <b>{label(rate)}</b>
+    </label>
+  );
+}
+
 /** Pick the narrator voice. "Auto" picks the most natural voice installed. */
 export function NarratorVoice() {
   const [, force] = useState(0);
@@ -244,8 +275,8 @@ export function NarratorVoice() {
     <label className="lp-voice">
       <span>Narrator voice</span>
       <select value={chosen} onChange={(e) => pick(e.target.value)}>
-        <option value="">Auto (most natural)</option>
-        {voices.map((v) => <option key={v.name} value={v.name}>{v.name.replace(/^Microsoft |^Google /, '').replace(/ Online \(Natural\)/, ' (Natural)')}</option>)}
+        <option value="">Auto (natural, no delay)</option>
+        {voices.map((v) => <option key={v.name} value={v.name}>{v.name.replace(/^Microsoft |^Google /, '').replace(/ Online \(Natural\)/, ' (Natural)')}{v.localService ? '' : ' · online, may lag'}</option>)}
       </select>
     </label>
   );
