@@ -75,7 +75,7 @@ function humanize(text: string) {
 function sentences(text: string) {
   const parts = (text.match(/[^.!?:]+[.!?:]*(\s|$)/g) ?? [text]).map((t) => t.trim()).filter(Boolean);
   // every utterance has start-up latency, so join sentences into chunks of up to ~180 characters
-  // the first chunk stays short (usually the step title) so the voice starts as soon as the step shows
+  // the first chunk stays short so the voice starts as soon as the step shows
   const out: string[] = [];
   for (const p of parts) {
     const last = out[out.length - 1];

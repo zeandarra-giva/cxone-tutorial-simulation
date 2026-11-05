@@ -9,6 +9,9 @@ export default defineConfig({
     cssCodeSplit: false,
     modulePreload: false,
     assetsInlineLimit: 100_000_000,
+    // keep the output readable: the shared HTML file is meant to be opened and read
+    minify: false,
+    cssMinify: false,
     rollupOptions: { output: { inlineDynamicImports: true } },
   },
 });

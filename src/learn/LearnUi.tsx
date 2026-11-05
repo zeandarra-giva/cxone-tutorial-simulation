@@ -141,12 +141,12 @@ export function nodeText(n: ReactNode): string {
   return '';
 }
 
-function narrate(title: string, body: ReactNode, step?: { target?: string; advance: string }) {
+/** Reads out the step's description only; the title is left to the screen. */
+function narrate(body: ReactNode) {
   stopSpeech();
   const p = getProgress();
   if (!p.voice && !p.captions) return;
-  void step;
-  const text = `${title}. ${nodeText(body)}`.replace(/[⋮→↗👆]/g, ' ').replace(/\s+/g, ' ');
+  const text = nodeText(body).replace(/[⋮→↗👆]/g, ' ').replace(/\s+/g, ' ');
   void speak(text, 'narrator', { caption: true });
 }
 
@@ -155,7 +155,7 @@ export function LessonPlayer({ onExit }: { onExit?: () => void }) {
   const step = tour?.steps[index];
   // narrate each step as it starts
   useEffect(() => {
-    if (step) narrate(step.title, step.body, step);
+    if (step) narrate(step.body);
   }, [tour?.id, index]);
   useEffect(() => () => stopSpeech(), []);
   // keep the current step visible in the sidebar's step list. Only the sidebar's own scroll area moves
@@ -192,7 +192,7 @@ export function LessonPlayer({ onExit }: { onExit?: () => void }) {
         )}
         <div className="lp-ctrls">
           <button disabled={index === 0} onClick={back}><ArrowLeft size={14} /> Back</button>
-          <button onClick={() => narrate(step.title, step.body, step)} title="Hear this step again"><RotateCcw size={14} /> Replay</button>
+          <button onClick={() => narrate(step.body)} title="Hear this step again"><RotateCcw size={14} /> Replay</button>
           <span className="flex1" />
           <button className="lp-exit" onClick={doExit}><LogOut size={14} /> Exit lesson</button>
         </div>
